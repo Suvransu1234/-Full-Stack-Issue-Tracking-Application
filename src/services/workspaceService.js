@@ -1,0 +1,365 @@
+import { supabase } from '../lib/supabase'
+
+const requireClient = () => {
+  if (!supabase) {
+    throw new Error('Supabase environment variables are missing.')
+  }
+  return supabase
+}
+
+export async function getMyWorkspaces(userId) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('workspace_members')
+    .select('role, workspaces(id, name, created_at)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []).map((row) => ({
+    role: row.role,
+    ...row.workspaces,
+  }))
+}
+
+export async function createWorkspace(name) {
+  const client = requireClient()
+  const { data, error } = await client.rpc('create_workspace_with_owner', {
+    workspace_name: name,
+  })
+
+  if (error) throw error
+  return data
+}
+
+export async function getWorkspaceBundle(workspaceId, userId) {
+  const client = requireClient()
+
+  const [
+    workspaceResult,
+    membershipResult,
+    membersResult,
+    sectionsResult,
+    labelsResult,
+    tasksResult,
+    notificationsResult,
+  ] = await Promise.all([
+    client.from('workspaces').select('*').eq('id', workspaceId).single(),
+    client
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .single(),
+    client
+      .from('workspace_members')
+      .select('id, role, profiles(id, email, full_name, avatar_url)')
+      .eq('workspace_id', workspaceId),
+    client
+      .from('sections')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('order_index'),
+    client
+      .from('labels')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('name'),
+    client
+      .from('tasks')
+      .select('*, task_labels(labels(*))')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false }),
+    client
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ])
+
+  const error =
+    workspaceResult.error ||
+    membershipResult.error ||
+    membersResult.error ||
+    sectionsResult.error ||
+    labelsResult.error ||
+    tasksResult.error ||
+    notificationsResult.error
+
+  if (error) throw error
+
+  return {
+    workspace: workspaceResult.data,
+    role: membershipResult.data?.role || 'member',
+    members: membersResult.data || [],
+    sections: sectionsResult.data || [],
+    labels: labelsResult.data || [],
+    tasks: (tasksResult.data || []).map((task) => ({
+      ...task,
+      labels: (task.task_labels || []).map((item) => item.labels).filter(Boolean),
+    })),
+    notifications: notificationsResult.data || [],
+  }
+}
+
+export async function addMemberByEmail(workspaceId, email, role) {
+  const client = requireClient()
+  const { data, error } = await client.rpc('add_workspace_member_by_email', {
+    workspace_id_input: workspaceId,
+    member_email: email,
+    member_role: role,
+  })
+
+  if (error) throw error
+  return data
+}
+
+export async function createTeamInvite(workspaceId, email, role, userId) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('team_invites')
+    .insert({
+      workspace_id: workspaceId,
+      email,
+      role,
+      created_by: userId,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function acceptTeamInvite(token) {
+  const client = requireClient()
+  const { data, error } = await client.rpc('accept_team_invite', {
+    invite_token: token,
+  })
+
+  if (error) throw error
+  return data
+}
+
+export async function createSection(workspaceId, name) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('sections')
+    .insert({ workspace_id: workspaceId, name })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function createLabel(workspaceId, name, color) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('labels')
+    .insert({ workspace_id: workspaceId, name, color })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function saveTask(task, labelIds = []) {
+  const client = requireClient()
+  const shouldSyncLabels = Array.isArray(labelIds)
+  const payload = {
+    workspace_id: task.workspace_id,
+    section_id: task.section_id || null,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    due_date: task.due_date || null,
+    assigned_to: task.assigned_to || null,
+    visibility_role: task.visibility_role || null,
+    created_by: task.created_by,
+    created_by_role: task.created_by_role,
+    share_token: task.share_token || crypto.randomUUID(),
+  }
+
+  const query = task.id
+    ? client.from('tasks').update(payload).eq('id', task.id)
+    : client.from('tasks').insert(payload)
+
+  const { data, error } = await query.select().single()
+  if (error) throw error
+
+  if (!shouldSyncLabels) return data
+
+  await client.from('task_labels').delete().eq('task_id', data.id)
+
+  if (labelIds.length > 0) {
+    const rows = labelIds.map((labelId) => ({
+      task_id: data.id,
+      label_id: labelId,
+    }))
+    const { error: labelsError } = await client.from('task_labels').insert(rows)
+    if (labelsError) throw labelsError
+  }
+
+  if (data.assigned_to && data.assigned_to !== data.created_by) {
+    await createNotification(
+      data.assigned_to,
+      data.id,
+      'assigned',
+      `You were assigned: ${data.title}`,
+    )
+  }
+
+  return data
+}
+
+export async function updateTaskStatus(taskId, status) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('tasks')
+    .update({ status })
+    .eq('id', taskId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteTask(taskId) {
+  const client = requireClient()
+  const { error } = await client.from('tasks').delete().eq('id', taskId)
+  if (error) throw error
+}
+
+export async function enableTaskSharing(taskId) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('tasks')
+    .update({
+      share_enabled: true,
+      share_token: crypto.randomUUID(),
+    })
+    .eq('id', taskId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function getComments(taskId) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('comments')
+    .select('*, profiles(id, email, full_name, avatar_url)')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function addComment(task, userId, content, mentionedUserIds = []) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('comments')
+    .insert({ task_id: task.id, user_id: userId, content })
+    .select('*, profiles(id, email, full_name, avatar_url)')
+    .single()
+
+  if (error) throw error
+
+  const notifiedUsers = new Set()
+
+  if (task.assigned_to && task.assigned_to !== userId) {
+    notifiedUsers.add(task.assigned_to)
+    await createNotification(
+      task.assigned_to,
+      task.id,
+      'comment',
+      `New comment on: ${task.title}`,
+    )
+  }
+
+  if (task.created_by && task.created_by !== userId && !notifiedUsers.has(task.created_by)) {
+    notifiedUsers.add(task.created_by)
+    await createNotification(
+      task.created_by,
+      task.id,
+      'comment',
+      `New comment on your task: ${task.title}`,
+    )
+  }
+
+  for (const mentionedUserId of mentionedUserIds) {
+    if (mentionedUserId === userId || notifiedUsers.has(mentionedUserId)) continue
+    notifiedUsers.add(mentionedUserId)
+    await createNotification(
+      mentionedUserId,
+      task.id,
+      'mention',
+      `You were mentioned on: ${task.title}`,
+    )
+  }
+
+  return data
+}
+
+export async function createNotification(userId, taskId, type, message) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('notifications')
+    .insert({ user_id: userId, task_id: taskId, type, message })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  try {
+    await client.functions.invoke('send-notification-email', {
+      body: { notificationId: data.id },
+    })
+  } catch (emailError) {
+    console.warn('Email notification was not sent.', emailError)
+  }
+
+  return data
+}
+
+export async function markNotificationRead(notificationId) {
+  const client = requireClient()
+  const { error } = await client
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId)
+
+  if (error) throw error
+}
+
+export async function markAllNotificationsRead(userId) {
+  const client = requireClient()
+  const { error } = await client
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('read', false)
+
+  if (error) throw error
+}
+
+export async function getPublicTaskByToken(token) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('tasks')
+    .select('id, title, description, status, priority, due_date, share_token')
+    .eq('share_token', token)
+    .eq('share_enabled', true)
+    .single()
+
+  if (error) throw error
+  return data
+}
