@@ -17,7 +17,7 @@ import {
   saveTask,
   updateTaskStatus,
 } from '../services/workspaceService'
-import { canViewTask, isOverdue, PRIORITIES, roleLabel, STATUSES } from '../lib/constants'
+import { canViewTask, isOverdue, PRIORITIES, roleLabel, statusLabel, STATUSES } from '../lib/constants'
 
 const labelColors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#ea580c']
 const WORKSPACE_VIEWS = ['board', 'list', 'team', 'setup']
@@ -46,6 +46,7 @@ export default function WorkspacePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draggedTaskId, setDraggedTaskId] = useState(null)
   const [dragOverStatus, setDragOverStatus] = useState(null)
+  const [boardPropertiesOpen, setBoardPropertiesOpen] = useState(false)
   const [toast, setToast] = useState(null)
   const [error, setError] = useState('')
   const filterMenuRef = useRef(null)
@@ -139,10 +140,30 @@ export default function WorkspacePage() {
       )
   }, [bundle, labelFilter, priorityFilter, searchQuery, statusFilter, user.id])
 
+  const listSectionGroups = useMemo(() => {
+    if (!bundle) return []
+
+    const sectionGroups = bundle.sections.map((section) => ({
+      id: section.id,
+      name: section.name,
+      tasks: visibleTasks.filter((task) => task.section_id === section.id),
+    }))
+
+    const noSectionTasks = visibleTasks.filter((task) => !task.section_id)
+    if (noSectionTasks.length > 0 || sectionGroups.length === 0) {
+      sectionGroups.push({
+        id: 'no-section',
+        name: 'No section',
+        tasks: noSectionTasks,
+      })
+    }
+
+    return sectionGroups
+  }, [bundle, visibleTasks])
+
   const overdueTasks = visibleTasks.filter(isOverdue)
   const unreadNotifications = bundle?.notifications?.filter((item) => !item.read) || []
   const isAdmin = bundle?.role === 'admin'
-  const propertiesOpen = true
   const activeFilterCount = [statusFilter, priorityFilter, labelFilter]
     .filter((value) => value !== 'all').length
 
@@ -475,6 +496,15 @@ export default function WorkspacePage() {
           >
             Add Filter{activeFilterCount ? ` (${activeFilterCount})` : '...'}
           </button>
+          {view === 'board' && (
+            <button
+              type="button"
+              className={`ghost-button ${boardPropertiesOpen ? 'is-active' : ''}`}
+              onClick={() => setBoardPropertiesOpen((open) => !open)}
+            >
+              Display
+            </button>
+          )}
           {filtersOpen && (
             <div className="filter-menu-shell">
               <div className="filter-menu">
@@ -602,7 +632,7 @@ export default function WorkspacePage() {
       </section>
 
       {view === 'board' && (
-        <section className={`linear-board-shell ${propertiesOpen ? '' : 'without-properties'}`}>
+        <section className={`linear-board-shell ${boardPropertiesOpen ? '' : 'without-properties'}`}>
           <div className="kanban-board">
             {STATUSES.map((status) => {
               const statusTasks = visibleTasks.filter((task) => task.status === status.value)
@@ -610,7 +640,7 @@ export default function WorkspacePage() {
               return (
                 <div
                   key={status.value}
-                  className={`kanban-column ${dragOverStatus === status.value ? 'is-drop-target' : ''}`}
+                  className={`kanban-column status-column-${status.value} ${dragOverStatus === status.value ? 'is-drop-target' : ''}`}
                   onDragOver={(event) => {
                     event.preventDefault()
                     event.dataTransfer.dropEffect = 'move'
@@ -652,7 +682,7 @@ export default function WorkspacePage() {
             })}
           </div>
 
-          {propertiesOpen && (
+          {boardPropertiesOpen && (
             <aside className="properties-panel">
               <section>
                 <h3>Properties</h3>
@@ -676,74 +706,88 @@ export default function WorkspacePage() {
       )}
 
       {view === 'list' && (
-        <section className="workspace-page-section panel">
-          <div className="table-wrap">
-            <table className="issue-table">
-              <thead>
-                <tr>
-                  <th>Task</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Section</th>
-                  <th>Assignee</th>
-                  <th>Labels</th>
-                  <th>Due</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTasks.map((task) => {
-                  const section = bundle.sections.find((item) => item.id === task.section_id)
-                  const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
-
-                  return (
-                    <tr key={task.id}>
-                      <td>
-                        <button
-                          type="button"
-                          className="table-title-button"
-                          onClick={() => setSelectedTask(task)}
-                        >
-                          <strong>{task.title}</strong>
-                        </button>
-                      </td>
-                      <td>{task.status}</td>
-                      <td>
-                        <span className={`priority priority-${task.priority?.toLowerCase()}`}>
-                          {task.priority}
-                        </span>
-                      </td>
-                      <td>{section?.name || 'No section'}</td>
-                      <td>{assignee?.profiles?.full_name || assignee?.profiles?.email || 'Unassigned'}</td>
-                      <td>
-                        <div className="table-labels">
-                          {task.labels?.map((label) => (
-                            <span key={label.id} className="label-pill" style={{ borderColor: label.color }}>
-                              {label.name}
-                            </span>
-                          ))}
-                          {task.labels?.length === 0 && <span className="muted-cell">No labels</span>}
-                        </div>
-                      </td>
-                      <td>{task.due_date || 'No date'}</td>
-                      <td>
-                        <button type="button" className="ghost-button" onClick={() => setSelectedTask(task)}>
-                          Open
-                        </button>
-                      </td>
+        <section className="workspace-page-section list-section-groups">
+          {listSectionGroups.map((group) => (
+            <article key={group.id} className="panel section-table-panel">
+              <header className="section-table-header">
+                <div>
+                  <h2>{group.name}</h2>
+                  <span>{group.tasks.length} issue{group.tasks.length === 1 ? '' : 's'}</span>
+                </div>
+              </header>
+              <div className="table-wrap section-table-scroll">
+                <table className="issue-table">
+                  <thead>
+                    <tr>
+                      <th>Task</th>
+                      <th>Status</th>
+                      <th>Priority</th>
+                      <th>Section</th>
+                      <th>Assignee</th>
+                      <th>Labels</th>
+                      <th>Due</th>
+                      <th>Action</th>
                     </tr>
-                  )
-                })}
-                {visibleTasks.length === 0 && (
-                  <tr>
-                    <td colSpan="8">
-                      <p className="empty-table">No issues match the current filters.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {group.tasks.map((task) => {
+                      const section = bundle.sections.find((item) => item.id === task.section_id)
+                      const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
+
+                      return (
+                        <tr key={task.id}>
+                          <td>
+                            <button
+                              type="button"
+                              className="table-title-button"
+                              onClick={() => setSelectedTask(task)}
+                            >
+                              <strong>{task.title}</strong>
+                            </button>
+                          </td>
+                          <td>
+                            <span className={`status-pill status-pill-${task.status}`}>
+                              {statusLabel(task.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`priority priority-${task.priority?.toLowerCase()}`}>
+                              {task.priority}
+                            </span>
+                          </td>
+                          <td>{section?.name || 'No section'}</td>
+                          <td>{assignee?.profiles?.full_name || assignee?.profiles?.email || 'Unassigned'}</td>
+                          <td>
+                            <div className="table-labels">
+                              {task.labels?.map((label) => (
+                                <span key={label.id} className="label-pill" style={{ borderColor: label.color }}>
+                                  {label.name}
+                                </span>
+                              ))}
+                              {task.labels?.length === 0 && <span className="muted-cell">No labels</span>}
+                            </div>
+                          </td>
+                          <td>{task.due_date || 'No date'}</td>
+                          <td>
+                            <button type="button" className="ghost-button" onClick={() => setSelectedTask(task)}>
+                              Open
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {group.tasks.length === 0 && (
+                      <tr>
+                        <td colSpan="8">
+                          <p className="empty-table">No issues in this section.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ))}
         </section>
       )}
 
@@ -783,13 +827,16 @@ export default function WorkspacePage() {
                 {teamMessage && <p className="form-message success">{teamMessage}</p>}
                 {inviteLink && (
                   <div className="invite-link-box">
-                    <input value={inviteLink} readOnly />
+                    <div>
+                      <strong>Invite link ready</strong>
+                      <small>The private token is hidden. Copy it only when you need to test manually.</small>
+                    </div>
                     <button
                       type="button"
                       className="ghost-button"
                       onClick={() => navigator.clipboard.writeText(inviteLink)}
                     >
-                      Copy
+                      Copy invite link
                     </button>
                   </div>
                 )}
@@ -888,6 +935,7 @@ export default function WorkspacePage() {
           role={bundle.role}
           userId={user.id}
           workspaceId={workspaceId}
+          workspaceName={bundle.workspace.name}
           members={bundle.members}
           sections={bundle.sections}
           labels={bundle.labels}

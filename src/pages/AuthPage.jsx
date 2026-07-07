@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, LockKeyhole, Mail, User, Workflow } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 
@@ -9,19 +10,33 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 3500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const showToast = ({ title, message, type = 'success' }) => {
+    setToast({ title, message, type })
+  }
 
   if (user) return <Navigate to="/" replace />
 
   const submit = async (event) => {
     event.preventDefault()
     setLoading(true)
-    setMessage('')
+    setToast(null)
 
     if (mode === 'signup' && password !== confirmPassword) {
       setLoading(false)
-      setMessage('Password and confirm password must match.')
+      showToast({
+        title: 'Password mismatch',
+        message: 'Password and confirm password must match.',
+        type: 'error',
+      })
       return
     }
 
@@ -32,22 +47,28 @@ export default function AuthPage() {
 
     setLoading(false)
     if (error) {
-      setMessage(error.message)
+      showToast({
+        title: mode === 'login' ? 'Login failed' : 'Signup failed',
+        message: error.message,
+        type: 'error',
+      })
       return
     }
 
-    setMessage(
-      mode === 'login'
-        ? 'Login successful.'
-        : 'Signup successful. Check your email if confirmation is enabled.',
-    )
+    showToast({
+      title: mode === 'login' ? 'Login successful' : 'Signup successful',
+      message:
+        mode === 'login'
+          ? 'Opening your workspace now.'
+          : 'Check your email if confirmation is enabled.',
+    })
   }
 
   return (
     <main className="auth-page">
       <section className="auth-card">
         <div className="mini-logo" aria-hidden="true">
-          TF
+          <Workflow size={16} />
         </div>
 
         <div className="auth-heading">
@@ -58,26 +79,33 @@ export default function AuthPage() {
           {mode === 'signup' && (
             <label className="field">
               <span>Full name</span>
-              <input
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                required
-              />
+              <div className="auth-input-line">
+                <User size={17} aria-hidden="true" />
+                <input
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  required
+                />
+              </div>
             </label>
           )}
 
           <label className="field">
             <span>Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
+            <div className="auth-input-line">
+              <Mail size={17} aria-hidden="true" />
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
           </label>
           <label className="field">
             <span>Password</span>
-            <div className="password-line">
+            <div className="password-line auth-input-line">
+              <LockKeyhole size={17} aria-hidden="true" />
               <input
                 type="password"
                 value={password}
@@ -91,7 +119,7 @@ export default function AuthPage() {
                   disabled={loading || !isSupabaseConfigured}
                   aria-label="Login"
                 >
-                  -&gt;
+                  <ArrowRight size={20} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -100,7 +128,8 @@ export default function AuthPage() {
           {mode === 'signup' && (
             <label className="field">
               <span>Confirm password</span>
-              <div className="password-line">
+              <div className="password-line auth-input-line">
+                <LockKeyhole size={17} aria-hidden="true" />
                 <input
                   type="password"
                   value={confirmPassword}
@@ -113,7 +142,7 @@ export default function AuthPage() {
                   disabled={loading || !isSupabaseConfigured}
                   aria-label="Create account"
                 >
-                  -&gt;
+                  <ArrowRight size={20} aria-hidden="true" />
                 </button>
               </div>
             </label>
@@ -139,8 +168,6 @@ export default function AuthPage() {
             Microsoft
           </button>
         </div>
-
-        {message && <p className="form-message">{message}</p>}
 
         {!isSupabaseConfigured && (
           <div className="warning-box">
@@ -173,6 +200,18 @@ export default function AuthPage() {
           )}
         </div>
       </section>
+
+      {toast && (
+        <div className={`toast-message toast-${toast.type}`} role="status" aria-live="polite">
+          <div>
+            <strong>{toast.title}</strong>
+            <p>{toast.message}</p>
+          </div>
+          <button type="button" onClick={() => setToast(null)} aria-label="Close notification">
+            X
+          </button>
+        </div>
+      )}
     </main>
   )
 }

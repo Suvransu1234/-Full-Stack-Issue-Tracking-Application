@@ -4,6 +4,7 @@ import {
   canDeleteTask,
   canEditTaskMain,
   priorityLabel,
+  roleLabel,
   STATUSES,
   statusLabel,
 } from '../lib/constants'
@@ -35,6 +36,7 @@ export default function TaskDetail({
   role,
   userId,
   workspaceId,
+  workspaceName,
   members,
   sections,
   labels,
@@ -134,6 +136,7 @@ export default function TaskDetail({
 
   const section = sections.find((item) => item.id === task.section_id)
   const assignee = members.find((member) => member.profiles?.id === task.assigned_to)
+  const issueKey = `TF-${task.id.slice(0, 6).toUpperCase()}`
 
   return (
     <div className="issue-detail-backdrop">
@@ -143,11 +146,15 @@ export default function TaskDetail({
             <span className="project-icon">TF</span>
             <span>TrackFlow</span>
             <span>/</span>
-            <strong>{task.title}</strong>
+            <span>{workspaceName || 'Workspace'}</span>
+            <span>/</span>
+            <span>Issues</span>
+            <span>/</span>
+            <strong>{issueKey}</strong>
           </div>
           <div className="action-row">
             <button type="button" className="ghost-button" onClick={copyShareLink}>
-              {shareEnabled ? 'Copy link' : 'Share'}
+              Copy issue link
             </button>
             <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
               X
@@ -158,7 +165,7 @@ export default function TaskDetail({
         <div className="issue-detail-grid">
           <main className="issue-detail-main">
             <article className="issue-content">
-              <p className="eyebrow">Issue</p>
+              <p className="eyebrow">Issue {issueKey}</p>
               <h1>{task.title}</h1>
               <div className="issue-description">
                 {descriptionLines.length > 0 ? (
@@ -168,7 +175,11 @@ export default function TaskDetail({
                 )}
               </div>
 
-              {shareUrl && <p className="share-confirmation">Share link copied: {shareUrl}</p>}
+              {shareUrl && (
+                <p className="share-confirmation">
+                  Share link copied. Anyone with this link can open a read-only view of this issue.
+                </p>
+              )}
 
               <div className="divider" />
               <section className="comments-section">
@@ -280,15 +291,19 @@ export default function TaskDetail({
               <h3>Project</h3>
               <div className="property-row">
                 <span>Workspace</span>
-                <strong>TrackFlow</strong>
+                <strong>{workspaceName || 'Workspace'}</strong>
               </div>
               <div className="property-row">
                 <span>Visibility</span>
-                <strong>{task.visibility_role || 'All members'}</strong>
+                <strong>{task.visibility_role ? roleLabel(task.visibility_role) : 'All members'}</strong>
               </div>
-              <button type="button" className="ghost-button full-width-button" onClick={copyShareLink}>
-                {shareEnabled ? 'Copy share link' : 'Generate share link'}
-              </button>
+              <div className="share-link-card">
+                <strong>External share link</strong>
+                <p>Copy a read-only link for sharing this issue outside the workspace.</p>
+                <button type="button" className="ghost-button full-width-button" onClick={copyShareLink}>
+                  {shareEnabled ? 'Copy share link' : 'Generate share link'}
+                </button>
+              </div>
               {canDeleteTask(task, role) && (
                 <button type="button" className="danger-button full-width-button" onClick={() => onDelete(task)}>
                   Delete issue

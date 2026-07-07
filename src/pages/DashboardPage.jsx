@@ -5,6 +5,45 @@ import SettingsModal from '../components/SettingsModal'
 import { useAuth } from '../context/useAuth'
 import { createWorkspace, getMyWorkspaces } from '../services/workspaceService'
 
+const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const calendarCells = [
+  { date: 28, outside: true },
+  { date: 29, outside: true },
+  { date: 30, outside: true },
+  { date: 1 },
+  { date: 2 },
+  { date: 3, event: 'Planning', tone: 'blue' },
+  { date: 4 },
+  { date: 5 },
+  { date: 6, event: 'Auth fix', tone: 'red' },
+  { date: 7, today: true, event: 'Team invite', tone: 'green' },
+  { date: 8, event: 'Due task', tone: 'orange' },
+  { date: 9 },
+  { date: 10, event: 'Review', tone: 'purple' },
+  { date: 11 },
+  { date: 12 },
+  { date: 13 },
+  { date: 14, event: 'Frontend', tone: 'blue' },
+  { date: 15 },
+  { date: 16, event: 'Backend', tone: 'green' },
+  { date: 17 },
+  { date: 18 },
+  { date: 19 },
+  { date: 20 },
+  { date: 21, event: 'List view', tone: 'purple' },
+  { date: 22 },
+  { date: 23 },
+  { date: 24, event: 'Deploy', tone: 'orange' },
+  { date: 25 },
+  { date: 26 },
+  { date: 27 },
+  { date: 28 },
+  { date: 29, event: 'Demo', tone: 'green' },
+  { date: 30 },
+  { date: 31 },
+  { date: 1, outside: true },
+]
+
 export default function DashboardPage() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -101,19 +140,45 @@ export default function DashboardPage() {
       </section>
 
       <section id="workspaces" className="two-column">
-        <div className="panel">
-          <h2>Create workspace</h2>
-          <form className="inline-form" onSubmit={submit}>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="E-commerce Website"
-            />
-            <button type="submit" className="primary-button">
-              Create
-            </button>
-          </form>
-          {error && <p className="form-message error">{error}</p>}
+        <div className="dashboard-side-stack">
+          <div className="panel create-workspace-card">
+            <h2>Create workspace</h2>
+            <form className="inline-form" onSubmit={submit}>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="E-commerce Website"
+              />
+              <button type="submit" className="primary-button">
+                Create
+              </button>
+            </form>
+            {error && <p className="form-message error">{error}</p>}
+          </div>
+
+          <div className="panel dashboard-calendar-card">
+            <div className="panel-heading">
+              <div>
+                <h2>Calendar</h2>
+                <p className="hint">Upcoming issue activity</p>
+              </div>
+              <strong>Jul 2026</strong>
+            </div>
+            <div className="dashboard-calendar-grid">
+              {weekDays.map((day) => (
+                <strong key={day} className="calendar-weekday">{day}</strong>
+              ))}
+              {calendarCells.map((day, index) => (
+                <div
+                  key={`${day.date}-${index}`}
+                  className={`calendar-date-cell ${day.outside ? 'is-outside' : ''} ${day.today ? 'is-today' : ''}`}
+                >
+                  <span>{day.date}</span>
+                  {day.event && <small className={`calendar-event event-${day.tone}`}>{day.event}</small>}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="panel workspace-panel">
@@ -126,7 +191,7 @@ export default function DashboardPage() {
           {loading ? (
             <p className="hint">Loading workspaces...</p>
           ) : (
-            <div className="workspace-list">
+            <div className={`workspace-list ${workspaces.length > 5 ? 'is-scrollable' : ''}`}>
               {workspaces.map((workspace) => (
                 <button
                   key={workspace.id}
