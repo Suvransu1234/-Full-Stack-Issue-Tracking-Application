@@ -1,3 +1,15 @@
+import {
+  CircleDot,
+  CircleUserRound,
+  FolderKanban,
+  Inbox,
+  Layers,
+  List,
+  MoreHorizontal,
+  Settings,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 
@@ -9,16 +21,47 @@ const defaultNavigation = [
   { label: 'More', to: '/dashboard#workspaces' },
 ]
 
+const navIcons = {
+  inbox: Inbox,
+  'my issues': CircleUserRound,
+  projects: FolderKanban,
+  views: Layers,
+  more: MoreHorizontal,
+  settings: Settings,
+  board: CircleDot,
+  list: List,
+  team: Users,
+  setup: SlidersHorizontal,
+}
+
+const getNavigationIcon = (item) => {
+  const key = item.value || item.label?.toLowerCase()
+  return navIcons[key] || CircleDot
+}
+
+const renderNavigationContent = (item) => {
+  const Icon = getNavigationIcon(item)
+  return (
+    <>
+      <Icon size={16} aria-hidden="true" />
+      <span>{item.label}</span>
+    </>
+  )
+}
+
 export default function AppLayout({ children, primaryNavigation, workspaceNavigation }) {
-  const { profile, signOut } = useAuth()
-  const initial = (profile?.full_name || profile?.email || 'T').slice(0, 1).toUpperCase()
+  const { profile } = useAuth()
   const navigation = primaryNavigation || defaultNavigation
+  const settingsItem = navigation.find((item) => item.value === 'settings' || item.label === 'Settings')
+  const visibleNavigation = navigation.filter((item) => item !== settingsItem)
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <Link className="brand" to="/dashboard">
-          <span className="brand-mark">{initial}</span>
+          <span className="brand-mark">
+            <img src="/trackflow-logo.svg" alt="" />
+          </span>
           <span>
             <strong>{profile?.full_name || 'TrackFlow'}</strong>
             <small>Workspace</small>
@@ -26,7 +69,7 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
         </Link>
 
         <nav className="nav-list">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             if (item.onClick) {
               return (
                 <button
@@ -35,14 +78,14 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
                   className={item.active ? 'active' : ''}
                   onClick={item.onClick}
                 >
-                  {item.label}
+                  {renderNavigationContent(item)}
                 </button>
               )
             }
 
             return (
               <NavLink key={item.value || item.label || item.to} to={item.to}>
-                {item.label}
+                {renderNavigationContent(item)}
               </NavLink>
             )
           })}
@@ -59,7 +102,7 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
                   className={item.active ? 'active' : ''}
                   onClick={item.onClick}
                 >
-                  {item.label}
+                  {renderNavigationContent(item)}
                 </button>
               ))}
             </nav>
@@ -71,9 +114,15 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
             <strong>{profile?.full_name || 'User'}</strong>
             <small>{profile?.email}</small>
           </div>
-          <button type="button" className="ghost-button" onClick={signOut}>
-            Sign out
-          </button>
+          {settingsItem?.onClick && (
+            <button
+              type="button"
+              className={`user-settings-link ${settingsItem.active ? 'active' : ''}`}
+              onClick={settingsItem.onClick}
+            >
+              {renderNavigationContent(settingsItem)}
+            </button>
+          )}
         </div>
       </aside>
 

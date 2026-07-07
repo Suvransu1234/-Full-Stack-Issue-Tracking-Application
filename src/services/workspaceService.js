@@ -22,6 +22,47 @@ export async function getMyWorkspaces(userId) {
   }))
 }
 
+export async function getMyDueTasks(userId) {
+  const client = requireClient()
+  const { data: memberships, error: membershipsError } = await client
+    .from('workspace_members')
+    .select('role, workspace_id, workspaces(id, name)')
+    .eq('user_id', userId)
+
+  if (membershipsError) throw membershipsError
+
+  const workspaceIds = (memberships || []).map((membership) => membership.workspace_id)
+  if (workspaceIds.length === 0) return []
+
+  const { data, error } = await client
+    .from('tasks')
+    .select('id, title, status, priority, due_date, workspace_id, assigned_to, visibility_role')
+    .in('workspace_id', workspaceIds)
+    .not('due_date', 'is', null)
+    .order('due_date', { ascending: true })
+
+  if (error) throw error
+
+  const membershipByWorkspace = new Map(
+    (memberships || []).map((membership) => [membership.workspace_id, membership]),
+  )
+
+  return (data || [])
+    .filter((task) => {
+      const membership = membershipByWorkspace.get(task.workspace_id)
+      if (!membership) return false
+      if (membership.role === 'admin') return true
+      if (task.assigned_to === userId) return true
+      if (!task.visibility_role) return true
+      return task.visibility_role === membership.role
+    })
+    .map((task) => ({
+      ...task,
+      workspace_name:
+        membershipByWorkspace.get(task.workspace_id)?.workspaces?.name || 'Workspace',
+    }))
+}
+
 export async function createWorkspace(name) {
   const client = requireClient()
   const { data, error } = await client.rpc('create_workspace_with_owner', {

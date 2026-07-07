@@ -1,53 +1,32 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import SettingsModal from '../components/SettingsModal'
 import { useAuth } from '../context/useAuth'
-import { createWorkspace, getMyWorkspaces } from '../services/workspaceService'
+import { createWorkspace, getMyDueTasks, getMyWorkspaces } from '../services/workspaceService'
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const calendarCells = [
-  { date: 28, outside: true },
-  { date: 29, outside: true },
-  { date: 30, outside: true },
-  { date: 1 },
-  { date: 2 },
-  { date: 3, event: 'Planning', tone: 'blue' },
-  { date: 4 },
-  { date: 5 },
-  { date: 6, event: 'Auth fix', tone: 'red' },
-  { date: 7, today: true, event: 'Team invite', tone: 'green' },
-  { date: 8, event: 'Due task', tone: 'orange' },
-  { date: 9 },
-  { date: 10, event: 'Review', tone: 'purple' },
-  { date: 11 },
-  { date: 12 },
-  { date: 13 },
-  { date: 14, event: 'Frontend', tone: 'blue' },
-  { date: 15 },
-  { date: 16, event: 'Backend', tone: 'green' },
-  { date: 17 },
-  { date: 18 },
-  { date: 19 },
-  { date: 20 },
-  { date: 21, event: 'List view', tone: 'purple' },
-  { date: 22 },
-  { date: 23 },
-  { date: 24, event: 'Deploy', tone: 'orange' },
-  { date: 25 },
-  { date: 26 },
-  { date: 27 },
-  { date: 28 },
-  { date: 29, event: 'Demo', tone: 'green' },
-  { date: 30 },
-  { date: 31 },
-  { date: 1, outside: true },
-]
+
+const formatDateKey = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getTaskTone = (task) => {
+  const todayKey = formatDateKey(new Date())
+
+  if (task.due_date < todayKey) return 'red'
+  if (task.due_date === todayKey) return 'blue'
+  return 'orange'
+}
 
 export default function DashboardPage() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [workspaces, setWorkspaces] = useState([])
+  const [dueTasks, setDueTasks] = useState([])
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -69,12 +48,33 @@ export default function DashboardPage() {
     navigate(`/workspace/${workspace.id}?view=${view}`)
   }
 
+  const openTaskFromCalendar = (task) => {
+    window.localStorage.setItem('trackflow_default_workspace_id', task.workspace_id)
+    navigate(`/workspace/${task.workspace_id}?view=board&task=${task.id}`)
+  }
+
+  const openCalendarDate = (day) => {
+    if (day.tasks.length === 0) return
+    openTaskFromCalendar(day.tasks[0])
+  }
+
+  const handleCalendarDateKeyDown = (event, day) => {
+    if (day.tasks.length === 0) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openCalendarDate(day)
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const rows = await getMyWorkspaces(user.id)
+      const [rows, taskRows] = await Promise.all([
+        getMyWorkspaces(user.id),
+        getMyDueTasks(user.id),
+      ])
       setWorkspaces(rows)
+      setDueTasks(taskRows)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -113,6 +113,41 @@ export default function DashboardPage() {
           { label: 'Setup', value: 'setup', onClick: () => openDefaultWorkspaceView('setup') },
         ]
       : null
+
+  const dashboardCalendar = useMemo(() => {
+    const today = new Date()
+    const calendarYear = today.getFullYear()
+    const calendarMonth = today.getMonth()
+    const firstDay = new Date(calendarYear, calendarMonth, 1)
+    const startDate = new Date(calendarYear, calendarMonth, 1 - firstDay.getDay())
+    const todayKey = formatDateKey(today)
+    const tasksByDate = new Map()
+
+    dueTasks.forEach((task) => {
+      const list = tasksByDate.get(task.due_date) || []
+      list.push(task)
+      tasksByDate.set(task.due_date, list)
+    })
+
+    const cells = Array.from({ length: 42 }, (_, index) => {
+      const cellDate = new Date(startDate)
+      cellDate.setDate(startDate.getDate() + index)
+      const key = formatDateKey(cellDate)
+
+      return {
+        key,
+        date: cellDate.getDate(),
+        outside: cellDate.getMonth() !== calendarMonth,
+        today: key === todayKey,
+        tasks: tasksByDate.get(key) || [],
+      }
+    })
+
+    return {
+      title: today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      cells,
+    }
+  }, [dueTasks])
 
   return (
     <AppLayout primaryNavigation={primaryNavigation} workspaceNavigation={workspaceNavigation}>
@@ -160,21 +195,41 @@ export default function DashboardPage() {
             <div className="panel-heading">
               <div>
                 <h2>Calendar</h2>
-                <p className="hint">Upcoming issue activity</p>
+                <p className="hint">Tasks grouped by due date</p>
               </div>
-              <strong>Jul 2026</strong>
+              <strong>{dashboardCalendar.title}</strong>
             </div>
             <div className="dashboard-calendar-grid">
               {weekDays.map((day) => (
                 <strong key={day} className="calendar-weekday">{day}</strong>
               ))}
-              {calendarCells.map((day, index) => (
+              {dashboardCalendar.cells.map((day) => (
                 <div
-                  key={`${day.date}-${index}`}
-                  className={`calendar-date-cell ${day.outside ? 'is-outside' : ''} ${day.today ? 'is-today' : ''}`}
+                  key={day.key}
+                  className={`calendar-date-cell ${day.outside ? 'is-outside' : ''} ${day.today ? 'is-today' : ''} ${day.tasks.length > 0 ? 'has-tasks' : ''}`}
+                  role={day.tasks.length > 0 ? 'button' : undefined}
+                  tabIndex={day.tasks.length > 0 ? 0 : undefined}
+                  onClick={() => openCalendarDate(day)}
+                  onKeyDown={(event) => handleCalendarDateKeyDown(event, day)}
                 >
                   <span>{day.date}</span>
-                  {day.event && <small className={`calendar-event event-${day.tone}`}>{day.event}</small>}
+                  {day.tasks.slice(0, 2).map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className={`calendar-event event-${getTaskTone(task)}`}
+                      title={`${task.workspace_name}: ${task.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openTaskFromCalendar(task)
+                      }}
+                    >
+                      {task.title}
+                    </button>
+                  ))}
+                  {day.tasks.length > 2 && (
+                    <small className="calendar-more">+{day.tasks.length - 2} more</small>
+                  )}
                 </div>
               ))}
             </div>

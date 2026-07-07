@@ -85,6 +85,19 @@ export default function WorkspacePage() {
   }, [load])
 
   useEffect(() => {
+    if (!bundle) return
+
+    const taskIdFromUrl = searchParams.get('task')
+    if (!taskIdFromUrl) return
+
+    const taskFromUrl = bundle.tasks.find((task) => task.id === taskIdFromUrl)
+    if (taskFromUrl) {
+      setIsCreating(false)
+      setSelectedTask(taskFromUrl)
+    }
+  }, [bundle, searchParams])
+
+  useEffect(() => {
     window.localStorage.setItem('trackflow_default_workspace_id', workspaceId)
   }, [workspaceId])
 
@@ -109,6 +122,19 @@ export default function WorkspacePage() {
 
   const showToast = ({ title, message, type = 'success' }) => {
     setToast({ title, message, type })
+  }
+
+  const clearTaskRoute = () => {
+    if (!searchParams.has('task')) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('task')
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  const closeTaskDetail = () => {
+    setSelectedTask(null)
+    setIsCreating(false)
+    clearTaskRoute()
   }
 
   const visibleTasks = useMemo(() => {
@@ -211,6 +237,7 @@ export default function WorkspacePage() {
       } else {
         setSelectedTask(null)
         setIsCreating(false)
+        clearTaskRoute()
       }
       showToast({
         title: isNewTask ? 'Issue created' : 'Issue updated',
@@ -234,6 +261,7 @@ export default function WorkspacePage() {
     try {
       await deleteTask(task.id)
       setSelectedTask(null)
+      clearTaskRoute()
       showToast({
         title: 'Issue deleted',
         message: 'The task was removed from this workspace.',
@@ -941,10 +969,7 @@ export default function WorkspacePage() {
           labels={bundle.labels}
           onCreateLabel={createInlineLabel}
           onCreateSection={createInlineSection}
-          onClose={() => {
-            setSelectedTask(null)
-            setIsCreating(false)
-          }}
+          onClose={closeTaskDetail}
           onSave={submitTask}
           onDelete={removeTask}
         />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { addComment, enableTaskSharing, getComments } from '../services/workspaceService'
 import {
   canDeleteTask,
@@ -53,11 +53,39 @@ export default function TaskDetail({
   const [shareEnabled, setShareEnabled] = useState(Boolean(task?.share_enabled))
   const [shareToken, setShareToken] = useState(task?.share_token || '')
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const statusControlRef = useRef(null)
+  const shareConfirmationRef = useRef(null)
 
   const descriptionLines = useMemo(
     () => (task?.description || '').split('\n').filter((line) => line.trim()),
     [task?.description],
   )
+
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
+
+  useEffect(() => {
+    if (!statusMenuOpen && !shareUrl) return undefined
+
+    const closeFloatingUi = (event) => {
+      if (statusMenuOpen && !statusControlRef.current?.contains(event.target)) {
+        setStatusMenuOpen(false)
+      }
+
+      if (shareUrl && !shareConfirmationRef.current?.contains(event.target)) {
+        setShareUrl('')
+      }
+    }
+
+    document.addEventListener('mousedown', closeFloatingUi)
+    return () => document.removeEventListener('mousedown', closeFloatingUi)
+  }, [shareUrl, statusMenuOpen])
 
   useEffect(() => {
     if (!task?.id) return
@@ -124,9 +152,6 @@ export default function TaskDetail({
               <p className="eyebrow">New issue</p>
               <h2>Create task</h2>
             </div>
-            <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
-              X
-            </button>
           </div>
           {form}
         </section>
@@ -153,11 +178,8 @@ export default function TaskDetail({
             <strong>{issueKey}</strong>
           </div>
           <div className="action-row">
-            <button type="button" className="ghost-button" onClick={copyShareLink}>
+            <button type="button" className="ghost-button share-action-button issue-link-button" onClick={copyShareLink}>
               Copy issue link
-            </button>
-            <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
-              X
             </button>
           </div>
         </header>
@@ -176,7 +198,7 @@ export default function TaskDetail({
               </div>
 
               {shareUrl && (
-                <p className="share-confirmation">
+                <p className="share-confirmation" ref={shareConfirmationRef}>
                   Share link copied. Anyone with this link can open a read-only view of this issue.
                 </p>
               )}
@@ -227,7 +249,7 @@ export default function TaskDetail({
           <aside className="issue-properties">
             <section>
               <h3>Properties</h3>
-              <div className="issue-status-control">
+              <div className="issue-status-control" ref={statusControlRef}>
                 <button
                   type="button"
                   className="status-chip-button"
@@ -300,7 +322,7 @@ export default function TaskDetail({
               <div className="share-link-card">
                 <strong>External share link</strong>
                 <p>Copy a read-only link for sharing this issue outside the workspace.</p>
-                <button type="button" className="ghost-button full-width-button" onClick={copyShareLink}>
+                <button type="button" className="ghost-button full-width-button share-action-button external-link-button" onClick={copyShareLink}>
                   {shareEnabled ? 'Copy share link' : 'Generate share link'}
                 </button>
               </div>

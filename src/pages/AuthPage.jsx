@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, LockKeyhole, Mail, User, Workflow } from 'lucide-react'
+import { Eye, EyeOff, LockKeyhole, Mail, User } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 
@@ -12,6 +12,8 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     if (!toast) return undefined
@@ -67,8 +69,9 @@ export default function AuthPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="mini-logo" aria-hidden="true">
-          <Workflow size={16} />
+        <div className="auth-brand" aria-label="TrackFlow">
+          <img src="/trackflow-logo.svg" alt="" />
+          <span>TrackFlow</span>
         </div>
 
         <div className="auth-heading">
@@ -107,21 +110,19 @@ export default function AuthPage() {
             <div className="password-line auth-input-line">
               <LockKeyhole size={17} aria-hidden="true" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
-              {mode === 'login' && (
-                <button
-                  type="submit"
-                  className="arrow-submit"
-                  disabled={loading || !isSupabaseConfigured}
-                  aria-label="Login"
-                >
-                  <ArrowRight size={20} aria-hidden="true" />
-                </button>
-              )}
+              <button
+                type="button"
+                className="auth-eye-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+              </button>
             </div>
           </label>
 
@@ -131,27 +132,39 @@ export default function AuthPage() {
               <div className="password-line auth-input-line">
                 <LockKeyhole size={17} aria-hidden="true" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
                 />
                 <button
-                  type="submit"
-                  className="arrow-submit"
-                  disabled={loading || !isSupabaseConfigured}
-                  aria-label="Create account"
+                  type="button"
+                  className="auth-eye-toggle"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 >
-                  <ArrowRight size={20} aria-hidden="true" />
+                  {showConfirmPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
             </label>
           )}
+
+          <button
+            type="submit"
+            className="auth-submit-button"
+            disabled={loading || !isSupabaseConfigured}
+          >
+            {loading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create account'}
+          </button>
         </form>
 
         <p className="auth-helper">
           {mode === 'login' ? 'Sign in with your password.' : 'Sign up with your email.'}
         </p>
+
+        <div className="auth-divider">
+          <span>or continue with</span>
+        </div>
 
         <div className="social-row">
           <button

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="TrackFlow logo">
+  <rect width="96" height="96" rx="24" fill="#f8fbff"/>
+  <path d="M17 71 71 17h18L35 71H17Z" fill="#0073ea"/>
+  <path d="M9 55 55 9h18L27 55H9Z" fill="#00c875"/>
+  <path d="M40 87 87 40v18L58 87H40Z" fill="#e2445c"/>
+  <path d="M10 32 32 10h18L10 50V32Z" fill="#ffcc00"/>
+  <path d="M26 75 75 26h11L37 75H26Z" fill="#ffffff" opacity=".92"/>
+</svg>
