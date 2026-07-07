@@ -1,6 +1,6 @@
 import { isOverdue } from '../lib/constants'
 
-export default function TaskCard({ task, onOpen }) {
+export default function TaskCard({ task, onOpen, onDragStart, onDragEnd, isDragging }) {
   const issueKey = `TF-${task.id?.slice(0, 3).toUpperCase() || 'NEW'}`
   const initials = (task.assigned_to || task.title || 'TF').slice(0, 2).toUpperCase()
   const createdDate = task.created_at
@@ -9,8 +9,11 @@ export default function TaskCard({ task, onOpen }) {
 
   return (
     <article
-      className={`task-card ${isOverdue(task) ? 'is-overdue' : ''}`}
+      className={`task-card ${isOverdue(task) ? 'is-overdue' : ''} ${isDragging ? 'is-dragging' : ''}`}
+      draggable
       onClick={() => onOpen(task)}
+      onDragStart={(event) => onDragStart(event, task)}
+      onDragEnd={onDragEnd}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TrackFlow - Full-Stack Issue Tracking Application
 
 TrackFlow is a React + Supabase issue tracking app for the assignment. It supports authentication, workspaces, team roles, task sections, Kanban view, List view, comments, in-app notifications, due-date alerts, and shareable task links.
@@ -167,3 +168,6 @@ SUPABASE_SERVICE_ROLE_KEY
 ```
 
 If the Edge Function or email provider is not configured, the app still saves the in-app notification and does not block task/comment actions.
+=======
+# -Full-Stack-Issue-Tracking-Application
+>>>>>>> 6b1daffc743ee95aeed51a3f488816a6ccc19b28

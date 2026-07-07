@@ -41,7 +41,7 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
             }
 
             return (
-              <NavLink key={item.to || item.label} to={item.to}>
+              <NavLink key={item.value || item.label || item.to} to={item.to}>
                 {item.label}
               </NavLink>
             )

@@ -355,11 +355,25 @@ export async function getPublicTaskByToken(token) {
   const client = requireClient()
   const { data, error } = await client
     .from('tasks')
-    .select('id, title, description, status, priority, due_date, share_token')
+    .select(`
+      id,
+      title,
+      description,
+      status,
+      priority,
+      due_date,
+      share_token,
+      section_id,
+      sections(name),
+      task_labels(labels(id, name, color))
+    `)
     .eq('share_token', token)
     .eq('share_enabled', true)
     .single()
 
   if (error) throw error
-  return data
+  return {
+    ...data,
+    labels: (data.task_labels || []).map((item) => item.labels).filter(Boolean),
+  }
 }

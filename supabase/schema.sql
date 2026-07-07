@@ -397,6 +397,19 @@ drop policy if exists "sections visible to members" on sections;
 create policy "sections visible to members" on sections
 for select to authenticated using (get_workspace_role(workspace_id) is not null);
 
+drop policy if exists "shared sections public read" on sections;
+create policy "shared sections public read" on sections
+for select to anon
+using (
+  exists (
+    select 1
+    from tasks
+    where tasks.section_id = sections.id
+      and tasks.share_enabled = true
+      and tasks.share_token is not null
+  )
+);
+
 drop policy if exists "sections admin manage" on sections;
 create policy "sections admin manage" on sections
 for all to authenticated
@@ -406,6 +419,20 @@ with check (get_workspace_role(workspace_id) = 'admin');
 drop policy if exists "labels visible to members" on labels;
 create policy "labels visible to members" on labels
 for select to authenticated using (get_workspace_role(workspace_id) is not null);
+
+drop policy if exists "shared labels public read" on labels;
+create policy "shared labels public read" on labels
+for select to anon
+using (
+  exists (
+    select 1
+    from task_labels
+    join tasks on tasks.id = task_labels.task_id
+    where task_labels.label_id = labels.id
+      and tasks.share_enabled = true
+      and tasks.share_token is not null
+  )
+);
 
 drop policy if exists "labels admin manage" on labels;
 create policy "labels admin manage" on labels
@@ -446,6 +473,19 @@ drop policy if exists "task labels visible" on task_labels;
 create policy "task labels visible" on task_labels
 for select to authenticated
 using (exists (select 1 from tasks where tasks.id = task_labels.task_id));
+
+drop policy if exists "shared task labels public read" on task_labels;
+create policy "shared task labels public read" on task_labels
+for select to anon
+using (
+  exists (
+    select 1
+    from tasks
+    where tasks.id = task_labels.task_id
+      and tasks.share_enabled = true
+      and tasks.share_token is not null
+  )
+);
 
 drop policy if exists "task labels manage" on task_labels;
 create policy "task labels manage" on task_labels

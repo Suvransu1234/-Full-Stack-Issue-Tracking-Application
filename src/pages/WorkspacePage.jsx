@@ -44,6 +44,9 @@ export default function WorkspacePage() {
   const [activeFilterGroup, setActiveFilterGroup] = useState(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [draggedTaskId, setDraggedTaskId] = useState(null)
+  const [dragOverStatus, setDragOverStatus] = useState(null)
+  const [toast, setToast] = useState(null)
   const [error, setError] = useState('')
   const filterMenuRef = useRef(null)
 
@@ -97,6 +100,16 @@ export default function WorkspacePage() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick)
   }, [filtersOpen])
 
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const showToast = ({ title, message, type = 'success' }) => {
+    setToast({ title, message, type })
+  }
+
   const visibleTasks = useMemo(() => {
     if (!bundle) return []
     const normalizedSearch = searchQuery.trim().toLowerCase()
@@ -145,26 +158,115 @@ export default function WorkspacePage() {
     { value: 'labels', label: 'Labels' },
   ]
 
-  const submitTask = async (task, labelIds, options = {}) => {
-    const savedTask = await saveTask(task, labelIds)
-    if (options.keepOpen) {
-      setSelectedTask((current) => (current ? { ...current, ...savedTask } : savedTask))
-    } else {
-      setSelectedTask(null)
-      setIsCreating(false)
+  const openCreateTask = () => {
+    if (!isAdmin) {
+      showToast({
+        type: 'error',
+        title: 'Admin permission required',
+        message: 'Only Admins can create tasks in this workspace.',
+      })
+      return
     }
-    await load()
+
+    setIsCreating(true)
+  }
+
+  const submitTask = async (task, labelIds, options = {}) => {
+    const isNewTask = !task.id
+    if (isNewTask && !isAdmin) {
+      showToast({
+        type: 'error',
+        title: 'Admin permission required',
+        message: 'Only Admins can create tasks in this workspace.',
+      })
+      setIsCreating(false)
+      return
+    }
+
+    try {
+      const savedTask = await saveTask(task, labelIds)
+      if (options.keepOpen) {
+        setSelectedTask((current) => (current ? { ...current, ...savedTask } : savedTask))
+      } else {
+        setSelectedTask(null)
+        setIsCreating(false)
+      }
+      showToast({
+        title: isNewTask ? 'Issue created' : 'Issue updated',
+        message: isNewTask
+          ? 'The task is now available on the board.'
+          : 'Your changes were saved successfully.',
+      })
+      await load()
+    } catch (err) {
+      console.error(err)
+      showToast({
+        type: 'error',
+        title: 'Could not save issue',
+        message: 'Please check the task details and try again.',
+      })
+      throw err
+    }
   }
 
   const removeTask = async (task) => {
-    await deleteTask(task.id)
-    setSelectedTask(null)
-    await load()
+    try {
+      await deleteTask(task.id)
+      setSelectedTask(null)
+      showToast({
+        title: 'Issue deleted',
+        message: 'The task was removed from this workspace.',
+      })
+      await load()
+    } catch (err) {
+      console.error(err)
+      showToast({
+        type: 'error',
+        title: 'Could not delete issue',
+        message: 'You may not have permission to delete this task.',
+      })
+    }
   }
 
   const changeStatus = async (task, status) => {
-    await updateTaskStatus(task.id, status)
-    await load()
+    try {
+      await updateTaskStatus(task.id, status)
+      showToast({
+        title: 'Status updated',
+        message: 'The task moved to the selected column.',
+      })
+      await load()
+    } catch (err) {
+      console.error(err)
+      showToast({
+        type: 'error',
+        title: 'Could not update status',
+        message: 'Please try moving the task again.',
+      })
+    }
+  }
+
+  const startDraggingTask = (event, task) => {
+    setDraggedTaskId(task.id)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', task.id)
+  }
+
+  const dropTaskIntoStatus = async (event, status) => {
+    event.preventDefault()
+    const taskId = event.dataTransfer.getData('text/plain') || draggedTaskId
+    const task = visibleTasks.find((item) => item.id === taskId)
+
+    setDragOverStatus(null)
+    setDraggedTaskId(null)
+
+    if (!task || task.status === status) return
+    await changeStatus(task, status)
+  }
+
+  const stopDraggingTask = () => {
+    setDraggedTaskId(null)
+    setDragOverStatus(null)
   }
 
   const submitMember = async (event) => {
@@ -292,7 +394,7 @@ export default function WorkspacePage() {
             !
             {unreadNotifications.length > 0 && <span>{unreadNotifications.length}</span>}
           </button>
-          <button type="button" className="primary-button" onClick={() => setIsCreating(true)}>
+          <button type="button" className="primary-button" onClick={openCreateTask}>
             New issue
           </button>
 
@@ -506,14 +608,27 @@ export default function WorkspacePage() {
               const statusTasks = visibleTasks.filter((task) => task.status === status.value)
 
               return (
-                <div key={status.value} className="kanban-column">
+                <div
+                  key={status.value}
+                  className={`kanban-column ${dragOverStatus === status.value ? 'is-drop-target' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                    setDragOverStatus(status.value)
+                  }}
+                  onDragLeave={(event) => {
+                    if (event.currentTarget.contains(event.relatedTarget)) return
+                    setDragOverStatus(null)
+                  }}
+                  onDrop={(event) => dropTaskIntoStatus(event, status.value)}
+                >
                   <div className="column-title">
                     <div>
                       <span className={`status-ring status-${status.value}`} />
                       <h2>{status.label}</h2>
                       <small>{statusTasks.length}</small>
                     </div>
-                    <button type="button" onClick={() => setIsCreating(true)}>+</button>
+                    <button type="button" onClick={openCreateTask}>+</button>
                   </div>
                   <div className="column-stack">
                     {statusTasks.map((task) => (
@@ -521,11 +636,13 @@ export default function WorkspacePage() {
                         key={task.id}
                         task={task}
                         onOpen={setSelectedTask}
-                        onStatusChange={changeStatus}
+                        onDragStart={startDraggingTask}
+                        onDragEnd={stopDraggingTask}
+                        isDragging={draggedTaskId === task.id}
                       />
                     ))}
                     {statusTasks.length === 0 && (
-                      <button type="button" className="empty-issue" onClick={() => setIsCreating(true)}>
+                      <button type="button" className="empty-issue" onClick={openCreateTask}>
                         + Add issue
                       </button>
                     )}
@@ -783,6 +900,18 @@ export default function WorkspacePage() {
           onSave={submitTask}
           onDelete={removeTask}
         />
+      )}
+
+      {toast && (
+        <div className={`toast-message toast-${toast.type}`} role="status" aria-live="polite">
+          <div>
+            <strong>{toast.title}</strong>
+            <p>{toast.message}</p>
+          </div>
+          <button type="button" onClick={() => setToast(null)} aria-label="Close notification">
+            X
+          </button>
+        </div>
       )}
     </AppLayout>
   )
