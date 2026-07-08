@@ -151,7 +151,7 @@ export default function TaskForm({
         </label>
 
         {canChangeMainFields && onCreateSection && (
-          <div className="quick-create-field">
+          <div className="quick-create-field full-row">
             <span>New section</span>
             <div className="quick-create-row">
               <input

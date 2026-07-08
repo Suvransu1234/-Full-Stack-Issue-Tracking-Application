@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import SettingsModal from '../components/SettingsModal'
@@ -40,6 +41,7 @@ export default function WorkspacePage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [labelFilter, setLabelFilter] = useState('all')
+  const [expandedListSections, setExpandedListSections] = useState({})
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [activeFilterGroup, setActiveFilterGroup] = useState(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -65,8 +67,11 @@ export default function WorkspacePage() {
   const goToView = (nextView) => {
     if (!WORKSPACE_VIEWS.includes(nextView)) return
     setView(nextView)
+    setSelectedTask(null)
+    setIsCreating(false)
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('view', nextView)
+    nextParams.delete('task')
     setSearchParams(nextParams)
   }
 
@@ -204,6 +209,13 @@ export default function WorkspacePage() {
     { value: 'priority', label: 'Priority' },
     { value: 'labels', label: 'Labels' },
   ]
+
+  const toggleListSection = (sectionId, defaultOpen = false) => {
+    setExpandedListSections((current) => ({
+      ...current,
+      [sectionId]: !(current[sectionId] ?? defaultOpen),
+    }))
+  }
 
   const openCreateTask = () => {
     if (!isAdmin) {
@@ -735,87 +747,103 @@ export default function WorkspacePage() {
 
       {view === 'list' && (
         <section className="workspace-page-section list-section-groups">
-          {listSectionGroups.map((group) => (
-            <article key={group.id} className="panel section-table-panel">
-              <header className="section-table-header">
-                <div>
-                  <h2>{group.name}</h2>
-                  <span>{group.tasks.length} issue{group.tasks.length === 1 ? '' : 's'}</span>
-                </div>
-              </header>
-              <div className="table-wrap section-table-scroll">
-                <table className="issue-table">
-                  <thead>
-                    <tr>
-                      <th>Task</th>
-                      <th>Status</th>
-                      <th>Priority</th>
-                      <th>Section</th>
-                      <th>Assignee</th>
-                      <th>Labels</th>
-                      <th>Due</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.tasks.map((task) => {
-                      const section = bundle.sections.find((item) => item.id === task.section_id)
-                      const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
+          {listSectionGroups.map((group, index) => {
+            const defaultOpen = index === 0
+            const isExpanded = expandedListSections[group.id] ?? defaultOpen
 
-                      return (
-                        <tr key={task.id}>
-                          <td>
-                            <button
-                              type="button"
-                              className="table-title-button"
-                              onClick={() => setSelectedTask(task)}
-                            >
-                              <strong>{task.title}</strong>
-                            </button>
-                          </td>
-                          <td>
-                            <span className={`status-pill status-pill-${task.status}`}>
-                              {statusLabel(task.status)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`priority priority-${task.priority?.toLowerCase()}`}>
-                              {task.priority}
-                            </span>
-                          </td>
-                          <td>{section?.name || 'No section'}</td>
-                          <td>{assignee?.profiles?.full_name || assignee?.profiles?.email || 'Unassigned'}</td>
-                          <td>
-                            <div className="table-labels">
-                              {task.labels?.map((label) => (
-                                <span key={label.id} className="label-pill" style={{ borderColor: label.color }}>
-                                  {label.name}
-                                </span>
-                              ))}
-                              {task.labels?.length === 0 && <span className="muted-cell">No labels</span>}
-                            </div>
-                          </td>
-                          <td>{task.due_date || 'No date'}</td>
-                          <td>
-                            <button type="button" className="ghost-button" onClick={() => setSelectedTask(task)}>
-                              Open
-                            </button>
-                          </td>
+            return (
+              <article key={group.id} className={`panel section-table-panel ${isExpanded ? 'is-expanded' : ''}`}>
+                <button
+                  type="button"
+                  className="section-table-header"
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleListSection(group.id, defaultOpen)}
+                >
+                  <div>
+                    <h2>{group.name}</h2>
+                    <span>{group.tasks.length} issue{group.tasks.length === 1 ? '' : 's'}</span>
+                  </div>
+                  <span className="section-toggle-button">
+                    <span>{isExpanded ? 'Hide' : 'Show'}</span>
+                    <ChevronDown size={18} aria-hidden="true" />
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="table-wrap section-table-scroll">
+                    <table className="issue-table">
+                      <thead>
+                        <tr>
+                          <th>Task</th>
+                          <th>Status</th>
+                          <th>Priority</th>
+                          <th>Section</th>
+                          <th>Assignee</th>
+                          <th>Labels</th>
+                          <th>Due</th>
+                          <th>Action</th>
                         </tr>
-                      )
-                    })}
-                    {group.tasks.length === 0 && (
-                      <tr>
-                        <td colSpan="8">
-                          <p className="empty-table">No issues in this section.</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          ))}
+                      </thead>
+                      <tbody>
+                        {group.tasks.map((task) => {
+                          const section = bundle.sections.find((item) => item.id === task.section_id)
+                          const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
+
+                          return (
+                            <tr key={task.id}>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="table-title-button"
+                                  onClick={() => setSelectedTask(task)}
+                                >
+                                  <strong>{task.title}</strong>
+                                </button>
+                              </td>
+                              <td>
+                                <span className={`status-pill status-pill-${task.status}`}>
+                                  {statusLabel(task.status)}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`priority priority-${task.priority?.toLowerCase()}`}>
+                                  {task.priority}
+                                </span>
+                              </td>
+                              <td>{section?.name || 'No section'}</td>
+                              <td>{assignee?.profiles?.full_name || assignee?.profiles?.email || 'Unassigned'}</td>
+                              <td>
+                                <div className="table-labels">
+                                  {task.labels?.map((label) => (
+                                    <span key={label.id} className="label-pill" style={{ borderColor: label.color }}>
+                                      {label.name}
+                                    </span>
+                                  ))}
+                                  {task.labels?.length === 0 && <span className="muted-cell">No labels</span>}
+                                </div>
+                              </td>
+                              <td>{task.due_date || 'No date'}</td>
+                              <td>
+                                <button type="button" className="ghost-button" onClick={() => setSelectedTask(task)}>
+                                  Open
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {group.tasks.length === 0 && (
+                          <tr>
+                            <td colSpan="8">
+                              <p className="empty-table">No issues in this section.</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </article>
+            )
+          })}
         </section>
       )}
 

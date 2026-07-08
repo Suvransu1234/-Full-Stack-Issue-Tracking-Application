@@ -152,6 +152,9 @@ export default function TaskDetail({
               <p className="eyebrow">New issue</p>
               <h2>Create task</h2>
             </div>
+            <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+              X
+            </button>
           </div>
           {form}
         </section>
