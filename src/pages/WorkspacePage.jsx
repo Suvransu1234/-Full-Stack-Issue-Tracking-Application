@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Bell, ChevronDown } from 'lucide-react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import SettingsModal from '../components/SettingsModal'
@@ -49,6 +49,7 @@ export default function WorkspacePage() {
   const [draggedTaskId, setDraggedTaskId] = useState(null)
   const [dragOverStatus, setDragOverStatus] = useState(null)
   const [boardPropertiesOpen, setBoardPropertiesOpen] = useState(false)
+  const [dueModalOpen, setDueModalOpen] = useState(false)
   const [toast, setToast] = useState(null)
   const [error, setError] = useState('')
   const filterMenuRef = useRef(null)
@@ -214,7 +215,11 @@ export default function WorkspacePage() {
     return sectionGroups
   }, [bundle, visibleTasks])
 
-  const overdueTasks = visibleTasks.filter(isOverdue)
+  const overdueTasks = useMemo(() => visibleTasks.filter(isOverdue), [visibleTasks])
+  const overdueTaskIds = useMemo(
+    () => overdueTasks.map((task) => task.id).sort(),
+    [overdueTasks],
+  )
   const unreadNotifications = bundle?.notifications?.filter((item) => !item.read) || []
   const isAdmin = bundle?.role === 'admin'
   const activeFilterCount = [statusFilter, priorityFilter, labelFilter]
@@ -431,6 +436,35 @@ export default function WorkspacePage() {
     await load()
   }
 
+  const dueSeenStorageKey = `trackflow_seen_due_tasks_session_${user.id}_${workspaceId}`
+
+  const rememberSeenDueTasks = () => {
+    window.sessionStorage.setItem(dueSeenStorageKey, JSON.stringify(overdueTaskIds))
+  }
+
+  const closeDueModal = () => {
+    rememberSeenDueTasks()
+    setDueModalOpen(false)
+  }
+
+  const openDueTask = (task) => {
+    rememberSeenDueTasks()
+    setDueModalOpen(false)
+    setIsCreating(false)
+    setSelectedTask(task)
+  }
+
+  useEffect(() => {
+    if (overdueTaskIds.length === 0) return
+
+    const seenTaskIds = JSON.parse(window.sessionStorage.getItem(dueSeenStorageKey) || '[]')
+    const hasNewOverdueTask = overdueTaskIds.some((taskId) => !seenTaskIds.includes(taskId))
+
+    if (hasNewOverdueTask) {
+      setDueModalOpen(true)
+    }
+  }, [dueSeenStorageKey, overdueTaskIds])
+
   if (!bundle) {
     return (
       <AppLayout>
@@ -470,12 +504,14 @@ export default function WorkspacePage() {
           </button>
           <button
             type="button"
-            className="icon-button notification-button"
+            className={`icon-button notification-button ${unreadNotifications.length > 0 ? 'has-unread' : ''}`}
             aria-label="Notifications"
             onClick={() => setNotificationsOpen((open) => !open)}
           >
-            !
-            {unreadNotifications.length > 0 && <span>{unreadNotifications.length}</span>}
+            <Bell size={17} aria-hidden="true" />
+            {unreadNotifications.length > 0 && (
+              <span>{unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}</span>
+            )}
           </button>
           <button type="button" className="primary-button" onClick={openCreateTask}>
             New issue
@@ -519,12 +555,6 @@ export default function WorkspacePage() {
       </header>
 
       {error && <div className="warning-box">{error}</div>}
-
-      {overdueTasks.length > 0 && (
-        <div className="warning-box">
-          {overdueTasks.length} overdue task{overdueTasks.length > 1 ? 's' : ''} need attention.
-        </div>
-      )}
 
       <section className="linear-tabs">
         <div className="segmented">
@@ -1009,6 +1039,51 @@ export default function WorkspacePage() {
           onClose={() => setSettingsOpen(false)}
           onSignOut={signOut}
         />
+      )}
+
+      {dueModalOpen && (
+        <div className="due-modal-backdrop">
+          <section className="due-task-modal" aria-label="Due tasks">
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">Due date alert</p>
+                <h2>Tasks need attention</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={closeDueModal}
+                aria-label="Close due tasks"
+              >
+                X
+              </button>
+            </div>
+            <div className="due-task-list">
+              {overdueTasks.map((task) => {
+                const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
+                const section = bundle.sections.find((item) => item.id === task.section_id)
+
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="due-task-row"
+                    onClick={() => openDueTask(task)}
+                  >
+                    <span>
+                      <strong>{task.title}</strong>
+                      <small>{section?.name || 'No section'} · {statusLabel(task.status)}</small>
+                    </span>
+                    <span>
+                      <em>Due {task.due_date}</em>
+                      <small>{assignee?.profiles?.full_name || assignee?.profiles?.email || 'Unassigned'}</small>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        </div>
       )}
 
       {(selectedTask || isCreating) && (
