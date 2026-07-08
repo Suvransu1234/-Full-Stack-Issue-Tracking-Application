@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import SettingsModal from '../components/SettingsModal'
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const [workspaces, setWorkspaces] = useState([])
   const [dueTasks, setDueTasks] = useState([])
+  const [calendarMonthDate, setCalendarMonthDate] = useState(() => new Date())
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -63,6 +65,19 @@ export default function DashboardPage() {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     openCalendarDate(day)
+  }
+
+  const moveCalendarMonth = (amount) => {
+    setCalendarMonthDate((current) => {
+      const next = new Date(current)
+      next.setDate(1)
+      next.setMonth(current.getMonth() + amount)
+      return next
+    })
+  }
+
+  const showCurrentCalendarMonth = () => {
+    setCalendarMonthDate(new Date())
   }
 
   const load = useCallback(async () => {
@@ -116,8 +131,8 @@ export default function DashboardPage() {
 
   const dashboardCalendar = useMemo(() => {
     const today = new Date()
-    const calendarYear = today.getFullYear()
-    const calendarMonth = today.getMonth()
+    const calendarYear = calendarMonthDate.getFullYear()
+    const calendarMonth = calendarMonthDate.getMonth()
     const firstDay = new Date(calendarYear, calendarMonth, 1)
     const startDate = new Date(calendarYear, calendarMonth, 1 - firstDay.getDay())
     const todayKey = formatDateKey(today)
@@ -144,10 +159,10 @@ export default function DashboardPage() {
     })
 
     return {
-      title: today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      title: firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       cells,
     }
-  }, [dueTasks])
+  }, [calendarMonthDate, dueTasks])
 
   return (
     <AppLayout primaryNavigation={primaryNavigation} workspaceNavigation={workspaceNavigation}>
@@ -192,12 +207,30 @@ export default function DashboardPage() {
           </div>
 
           <div className="panel dashboard-calendar-card">
-            <div className="panel-heading">
-              <div>
-                <h2>Calendar</h2>
-                <p className="hint">Tasks grouped by due date</p>
+            <div className="panel-heading calendar-heading">
+              <div className="calendar-title">
+                <CalendarDays size={18} aria-hidden="true" />
+                <div>
+                  <h2>Calendar</h2>
+                  <p className="hint">Tasks grouped by due date</p>
+                </div>
               </div>
-              <strong>{dashboardCalendar.title}</strong>
+              <div className="calendar-controls" aria-label="Calendar month navigation">
+                <button
+                  type="button"
+                  onClick={() => moveCalendarMonth(-1)}
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft size={17} aria-hidden="true" />
+                </button>
+                <strong>{dashboardCalendar.title}</strong>
+                <button type="button" onClick={() => moveCalendarMonth(1)} aria-label="Next month">
+                  <ChevronRight size={17} aria-hidden="true" />
+                </button>
+                <button type="button" className="calendar-today-button" onClick={showCurrentCalendarMonth}>
+                  Today
+                </button>
+              </div>
             </div>
             <div className="dashboard-calendar-grid">
               {weekDays.map((day) => (

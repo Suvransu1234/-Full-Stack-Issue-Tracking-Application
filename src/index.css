@@ -1706,7 +1706,7 @@ th {
 
 .linear-board-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr);
   height: calc(100vh - 107px);
   min-height: 520px;
   overflow: hidden;
@@ -2024,9 +2024,65 @@ th {
   align-items: flex-start;
 }
 
-.dashboard-calendar-card .panel-heading strong {
+.calendar-heading {
+  flex-wrap: wrap;
+}
+
+.calendar-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.calendar-title>svg {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 10px;
+  color: #7c3aed;
+  background: #f0e7ff;
+}
+
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-controls strong {
+  min-width: 132px;
   color: var(--primary);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.calendar-controls button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid #d8e0ed;
+  border-radius: 8px;
+  color: #3b4658;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.calendar-controls button:hover {
+  border-color: #b9cdf0;
+  color: var(--primary);
+  background: #f4f8ff;
+}
+
+.calendar-controls .calendar-today-button {
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .dashboard-calendar-grid {
@@ -2414,6 +2470,55 @@ th {
 .filter-row.muted-row,
 .submenu-row.muted-row {
   color: #77777f;
+}
+
+.display-menu-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.display-properties-panel {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 24;
+  width: 270px;
+  overflow: hidden;
+  border: 1px solid #dfe6f2;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 24px 52px rgba(31, 35, 48, 0.18);
+}
+
+.display-properties-panel section {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.display-properties-panel h3 {
+  margin-bottom: 4px;
+  color: #172033;
+  font-size: 0.92rem;
+}
+
+.display-properties-panel button {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  color: #5f6878;
+  background: transparent;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.display-properties-panel button:hover {
+  color: #172033;
+  background: #f0f6ff;
 }
 
 .submenu-search {

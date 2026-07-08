@@ -52,6 +52,7 @@ export default function WorkspacePage() {
   const [toast, setToast] = useState(null)
   const [error, setError] = useState('')
   const filterMenuRef = useRef(null)
+  const displayMenuRef = useRef(null)
 
   useEffect(() => {
     const viewFromUrl = searchParams.get('view')
@@ -118,6 +119,18 @@ export default function WorkspacePage() {
     document.addEventListener('mousedown', closeOnOutsideClick)
     return () => document.removeEventListener('mousedown', closeOnOutsideClick)
   }, [filtersOpen])
+
+  useEffect(() => {
+    if (!boardPropertiesOpen) return undefined
+
+    const closeOnOutsideClick = (event) => {
+      if (displayMenuRef.current?.contains(event.target)) return
+      setBoardPropertiesOpen(false)
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick)
+  }, [boardPropertiesOpen])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -530,6 +543,7 @@ export default function WorkspacePage() {
             type="button"
             className={`ghost-button ${activeFilterCount ? 'has-filter' : ''}`}
             onClick={() => {
+              setBoardPropertiesOpen(false)
               setFiltersOpen((open) => !open)
               setActiveFilterGroup(null)
             }}
@@ -537,13 +551,40 @@ export default function WorkspacePage() {
             Add Filter{activeFilterCount ? ` (${activeFilterCount})` : '...'}
           </button>
           {view === 'board' && (
-            <button
-              type="button"
-              className={`ghost-button ${boardPropertiesOpen ? 'is-active' : ''}`}
-              onClick={() => setBoardPropertiesOpen((open) => !open)}
-            >
-              Display
-            </button>
+            <div className="display-menu-anchor" ref={displayMenuRef}>
+              <button
+                type="button"
+                className={`ghost-button ${boardPropertiesOpen ? 'is-active' : ''}`}
+                onClick={() => {
+                  setFiltersOpen(false)
+                  setActiveFilterGroup(null)
+                  setBoardPropertiesOpen((open) => !open)
+                }}
+              >
+                Display
+              </button>
+              {boardPropertiesOpen && (
+                <div className="display-properties-panel">
+                  <section>
+                    <h3>Properties</h3>
+                    <button type="button" onClick={() => setStatusFilter('todo')}>Todo status</button>
+                    <button type="button" onClick={() => setStatusFilter('in_progress')}>In progress</button>
+                    <button type="button" onClick={() => setPriorityFilter('P1')}>P1 priority</button>
+                    <button type="button" onClick={() => setPriorityFilter('P2')}>P2 priority</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiltersOpen(true)
+                        setActiveFilterGroup(null)
+                        setBoardPropertiesOpen(false)
+                      }}
+                    >
+                      All filters
+                    </button>
+                  </section>
+                </div>
+              )}
+            </div>
           )}
           {filtersOpen && (
             <div className="filter-menu-shell">
@@ -672,7 +713,7 @@ export default function WorkspacePage() {
       </section>
 
       {view === 'board' && (
-        <section className={`linear-board-shell ${boardPropertiesOpen ? '' : 'without-properties'}`}>
+        <section className="linear-board-shell">
           <div className="kanban-board">
             {STATUSES.map((status) => {
               const statusTasks = visibleTasks.filter((task) => task.status === status.value)
@@ -721,27 +762,6 @@ export default function WorkspacePage() {
               )
             })}
           </div>
-
-          {boardPropertiesOpen && (
-            <aside className="properties-panel">
-              <section>
-                <h3>Properties</h3>
-                <button type="button" onClick={() => setStatusFilter('todo')}>Todo status</button>
-                <button type="button" onClick={() => setStatusFilter('in_progress')}>In progress</button>
-                <button type="button" onClick={() => setPriorityFilter('P1')}>P1 priority</button>
-                <button type="button" onClick={() => setPriorityFilter('P2')}>P2 priority</button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFiltersOpen(true)
-                    setActiveFilterGroup(null)
-                  }}
-                >
-                  All filters
-                </button>
-              </section>
-            </aside>
-          )}
         </section>
       )}
 
