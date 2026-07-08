@@ -76,6 +76,8 @@ export async function createWorkspace(name) {
 export async function getWorkspaceBundle(workspaceId, userId) {
   const client = requireClient()
 
+  // Load the whole workspace screen in one request group so the UI can render
+  // board, list, team, labels, sections, and notifications from one bundle.
   const [
     workspaceResult,
     membershipResult,
@@ -136,6 +138,8 @@ export async function getWorkspaceBundle(workspaceId, userId) {
     members: membersResult.data || [],
     sections: sectionsResult.data || [],
     labels: labelsResult.data || [],
+    // Supabase returns task_labels as a join table; flatten it so components
+    // can use task.labels directly.
     tasks: (tasksResult.data || []).map((task) => ({
       ...task,
       labels: (task.task_labels || []).map((item) => item.labels).filter(Boolean),
@@ -314,6 +318,8 @@ export async function addComment(task, userId, content, mentionedUserIds = []) {
 
   if (error) throw error
 
+  // Avoid duplicate notifications when the same user is both assignee,
+  // creator, or mentioned in the same comment.
   const notifiedUsers = new Set()
 
   if (task.assigned_to && task.assigned_to !== userId) {
@@ -352,23 +358,36 @@ export async function addComment(task, userId, content, mentionedUserIds = []) {
 
 export async function createNotification(userId, taskId, type, message) {
   const client = requireClient()
+  // Notifications are created through an RPC because RLS should not allow
+  // the browser to directly insert rows for another user's inbox.
   const { data, error } = await client
-    .from('notifications')
-    .insert({ user_id: userId, task_id: taskId, type, message })
-    .select()
-    .single()
+    .rpc('create_task_notification', {
+      target_user_id: userId,
+      task_id_input: taskId,
+      notification_type: type,
+      notification_message: message,
+    })
 
   if (error) throw error
 
   try {
-    await client.functions.invoke('send-notification-email', {
-      body: { notificationId: data.id },
+    const { error: emailError } = await client.functions.invoke('send-notification-email', {
+      body: { notificationId: data },
     })
+    if (emailError) {
+      console.warn('Email notification was not sent.', emailError)
+    }
   } catch (emailError) {
     console.warn('Email notification was not sent.', emailError)
   }
 
-  return data
+  return {
+    id: data,
+    user_id: userId,
+    task_id: taskId,
+    type,
+    message,
+  }
 }
 
 export async function markNotificationRead(notificationId) {

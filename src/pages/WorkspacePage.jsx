@@ -79,6 +79,8 @@ export default function WorkspacePage() {
   const load = useCallback(async () => {
     setError('')
     try {
+      // This bundle is the single source of truth for the workspace screen.
+      // Board, list, team, setup, notifications, and task details all read from it.
       const data = await getWorkspaceBundle(workspaceId, user.id)
       setBundle(data)
     } catch (err) {
@@ -93,6 +95,8 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!bundle) return
 
+    // Shared issue links use ?task=<id>; when that param exists, open the
+    // matching task detail after the workspace data finishes loading.
     const taskIdFromUrl = searchParams.get('task')
     if (!taskIdFromUrl) return
 
@@ -159,6 +163,8 @@ export default function WorkspacePage() {
     if (!bundle) return []
     const normalizedSearch = searchQuery.trim().toLowerCase()
 
+    // Apply RBAC first, then search and filter controls. Every view uses this
+    // same list, so board and list always show the same authorized tasks.
     return bundle.tasks
       .filter((task) => canViewTask(task, bundle.role, user.id))
       .filter((task) => {
@@ -187,12 +193,15 @@ export default function WorkspacePage() {
   const listSectionGroups = useMemo(() => {
     if (!bundle) return []
 
+    // Convert sections into table groups. Each group owns only the tasks whose
+    // section_id matches that section.
     const sectionGroups = bundle.sections.map((section) => ({
       id: section.id,
       name: section.name,
       tasks: visibleTasks.filter((task) => task.section_id === section.id),
     }))
 
+    // Tasks without a section still need a visible list bucket.
     const noSectionTasks = visibleTasks.filter((task) => !task.section_id)
     if (noSectionTasks.length > 0 || sectionGroups.length === 0) {
       sectionGroups.push({
@@ -543,7 +552,6 @@ export default function WorkspacePage() {
             type="button"
             className={`ghost-button ${activeFilterCount ? 'has-filter' : ''}`}
             onClick={() => {
-              setBoardPropertiesOpen(false)
               setFiltersOpen((open) => !open)
               setActiveFilterGroup(null)
             }}
@@ -555,11 +563,7 @@ export default function WorkspacePage() {
               <button
                 type="button"
                 className={`ghost-button ${boardPropertiesOpen ? 'is-active' : ''}`}
-                onClick={() => {
-                  setFiltersOpen(false)
-                  setActiveFilterGroup(null)
-                  setBoardPropertiesOpen((open) => !open)
-                }}
+                onClick={() => setBoardPropertiesOpen((open) => !open)}
               >
                 Display
               </button>
@@ -804,6 +808,8 @@ export default function WorkspacePage() {
                         </tr>
                       </thead>
                       <tbody>
+                        {/* group is one section bucket from listSectionGroups;
+                            group.tasks are the rows for that section. */}
                         {group.tasks.map((task) => {
                           const section = bundle.sections.find((item) => item.id === task.section_id)
                           const assignee = bundle.members.find((item) => item.profiles?.id === task.assigned_to)
