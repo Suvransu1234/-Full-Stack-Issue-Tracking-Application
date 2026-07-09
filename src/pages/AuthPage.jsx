@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, User } from 'lucide-react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 
+const getSafeRedirect = (redirectValue) => {
+  if (!redirectValue || !redirectValue.startsWith('/') || redirectValue.startsWith('//')) {
+    return '/'
+  }
+
+  return redirectValue
+}
+
 export default function AuthPage() {
-  const { user, signIn, signUp, signInWithGoogle, isSupabaseConfigured } = useAuth()
+  const {
+    user,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut,
+    loading: authLoading,
+    isSupabaseConfigured,
+  } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isVerificationRedirect, setIsVerificationRedirect] = useState(
+    () => searchParams.get('verified') === '1',
+  )
+  const [verificationNoticeShown, setVerificationNoticeShown] = useState(false)
   const [mode, setMode] = useState('login')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -14,6 +35,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const redirectTo = getSafeRedirect(searchParams.get('redirect'))
 
   useEffect(() => {
     if (!toast) return undefined
@@ -21,11 +43,62 @@ export default function AuthPage() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    if (searchParams.get('verified') === '1') {
+      setIsVerificationRedirect(true)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!isVerificationRedirect || authLoading) return undefined
+
+    setMode('login')
+    setPassword('')
+    setConfirmPassword('')
+
+    if (!verificationNoticeShown) {
+      setToast({
+        title: 'Email verified',
+        message: 'Your email is verified. Please login with your password.',
+        type: 'success',
+      })
+      setVerificationNoticeShown(true)
+    }
+
+    if (searchParams.get('verified') === '1') {
+      setSearchParams({}, { replace: true })
+    }
+
+    if (!user) {
+      setIsVerificationRedirect(false)
+      return undefined
+    }
+
+    let active = true
+    signOut().finally(() => {
+      if (active) {
+        setIsVerificationRedirect(false)
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [
+    authLoading,
+    isVerificationRedirect,
+    searchParams,
+    setSearchParams,
+    signOut,
+    user,
+    verificationNoticeShown,
+  ])
+
   const showToast = ({ title, message, type = 'success' }) => {
     setToast({ title, message, type })
   }
 
-  if (user) return <Navigate to="/" replace />
+  if (user && !isVerificationRedirect) return <Navigate to={redirectTo} replace />
 
   const submit = async (event) => {
     event.preventDefault()
@@ -170,7 +243,7 @@ export default function AuthPage() {
           <button
             type="button"
             className="social-button"
-            onClick={signInWithGoogle}
+            onClick={() => signInWithGoogle(redirectTo)}
             disabled={!isSupabaseConfigured}
           >
             <span>G</span>
@@ -206,7 +279,7 @@ export default function AuthPage() {
                 Login
               </button>
               <span>.</span>
-              <button type="button" onClick={signInWithGoogle} disabled={!isSupabaseConfigured}>
+              <button type="button" onClick={() => signInWithGoogle(redirectTo)} disabled={!isSupabaseConfigured}>
                 Use Google instead
               </button>
             </>

@@ -11,7 +11,7 @@ import {
 import TaskForm from './TaskForm'
 
 const normalizeMention = (value = '') =>
-  value.toLowerCase().replace(/^@/, '').replace(/[^a-z0-9._-]/g, '')
+  value.toLowerCase().replace(/^@/, '').replace(/[^a-z0-9._@-]/g, '')
 
 const getMentionedUserIds = (content, members) => {
   const tokens = content.match(/@[a-z0-9._@-]+/gi) || []

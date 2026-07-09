@@ -1593,13 +1593,19 @@ th {
   box-shadow: 0 0 0 2px #ffffff;
 }
 
+.notification-menu-anchor {
+  position: relative;
+  display: grid;
+}
+
 .notification-popover {
   position: absolute;
-  top: 48px;
-  right: 84px;
+  top: 42px;
+  right: 0;
   z-index: 15;
-  width: min(360px, calc(100vw - 28px));
-  overflow: hidden;
+  width: min(340px, calc(100vw - 28px));
+  max-height: min(420px, calc(100vh - 110px));
+  overflow-y: auto;
   border: 1px solid #e6e6e8;
   border-radius: 8px;
   background: #fff;
@@ -1638,6 +1644,7 @@ th {
   border-bottom: 1px solid #f0f0f1;
   background: transparent;
   text-align: left;
+  cursor: pointer;
 }
 
 .notification-item:hover {
@@ -1669,6 +1676,7 @@ th {
 .empty-popover {
   color: #6f6f76;
   font-size: 0.84rem;
+  line-height: 1.35;
 }
 
 .overdue-item {
@@ -3407,8 +3415,8 @@ body {
   }
 
   .notification-popover {
-    top: 54px;
-    right: 14px;
+    top: 42px;
+    right: 0;
   }
 
   .linear-board-shell {

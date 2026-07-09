@@ -177,6 +177,20 @@ export async function createTeamInvite(workspaceId, email, role, userId) {
   return data
 }
 
+export async function getTeamInvite(token) {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('team_invites')
+    .select('id, email, role, expires_at, workspace_id, workspaces(name)')
+    .eq('token', token)
+    .eq('accepted', false)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function acceptTeamInvite(token) {
   const client = requireClient()
   const { data, error } = await client.rpc('accept_team_invite', {

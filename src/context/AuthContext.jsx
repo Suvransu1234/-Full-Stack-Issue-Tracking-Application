@@ -76,15 +76,16 @@ export function AuthProvider({ children }) {
           password,
           options: {
             data: metadata,
+            emailRedirectTo: `${window.location.origin}/auth?verified=1`,
           },
         }),
       signIn: (email, password) =>
         supabase.auth.signInWithPassword({ email, password }),
-      signInWithGoogle: () =>
+      signInWithGoogle: (redirectPath = '/dashboard') =>
         supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: `${window.location.origin}/dashboard`,
+            redirectTo: `${window.location.origin}${redirectPath}`,
           },
         }),
       signOut: () => supabase.auth.signOut(),
