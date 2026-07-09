@@ -180,6 +180,8 @@ export default function WorkspacePage() {
     setIsCreating(false)
     setSelectedTask(task)
 
+    // Store the task id in the URL so browser Back closes the detail view
+    // and keeps the user inside the same workspace.
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('view', view)
     nextParams.set('task', task.id)
@@ -190,13 +192,14 @@ export default function WorkspacePage() {
     if (!bundle) return []
     const normalizedSearch = searchQuery.trim().toLowerCase()
 
-    // Apply RBAC first, then search and filter controls. Every view uses this
-    // same list, so board and list always show the same authorized tasks.
+    // Apply RBAC first. Search/status/priority/label filters only run on
+    // tasks this user is allowed to see.
     return bundle.tasks
       .filter((task) => canViewTask(task, bundle.role, user.id))
       .filter((task) => {
         if (!normalizedSearch) return true
 
+        // Search across fields users naturally remember from the UI.
         const labelNames = task.labels?.map((label) => label.name).join(' ') || ''
         const sectionName =
           bundle.sections.find((section) => section.id === task.section_id)?.name || ''
@@ -352,6 +355,8 @@ export default function WorkspacePage() {
 
   const changeStatus = async (task, status) => {
     try {
+      // Status changes from drag/drop or the status menu only update one column.
+      // Full task edits still go through saveTask().
       await updateTaskStatus(task.id, status)
       showToast({
         title: 'Status updated',
@@ -371,6 +376,7 @@ export default function WorkspacePage() {
   const startDraggingTask = (event, task) => {
     setDraggedTaskId(task.id)
     event.dataTransfer.effectAllowed = 'move'
+    // Save the task id in the browser drag payload so the drop column can find it.
     event.dataTransfer.setData('text/plain', task.id)
   }
 
@@ -382,6 +388,7 @@ export default function WorkspacePage() {
     setDragOverStatus(null)
     setDraggedTaskId(null)
 
+    // No database call is needed if the task is dropped into its current column.
     if (!task || task.status === status) return
     await changeStatus(task, status)
   }
@@ -412,6 +419,8 @@ export default function WorkspacePage() {
     setError('')
     setTeamMessage('')
     try {
+      // The invite row stores target email, role, and token. The token becomes
+      // the /invite/:token link that the invited user opens.
       const invite = await createTeamInvite(
         workspaceId,
         memberEmail.trim(),
@@ -456,6 +465,8 @@ export default function WorkspacePage() {
   }
 
   const openNotification = async (notification) => {
+    // Open the related issue immediately, then mark the notification as read.
+    // This makes notification clicks feel instant.
     const task = findNotificationTask(notification)
     if (task) openTaskDetail(task)
     setNotificationsOpen(false)
@@ -604,6 +615,8 @@ export default function WorkspacePage() {
 
       {error && <div className="warning-box">{error}</div>}
 
+      {/* Navigation tab in linear top , showing list , team , setup , board  */}
+
       <section className="linear-tabs">
         <div className="segmented">
           <button type="button" className={view === 'board' ? 'active' : ''} onClick={() => goToView('board')}>
@@ -619,6 +632,9 @@ export default function WorkspacePage() {
             Setup
           </button>
         </div>
+
+        {/* search input and filter button  */}
+
         <div className="board-tools" ref={filterMenuRef}>
           <input
             className="issue-search"
@@ -626,6 +642,9 @@ export default function WorkspacePage() {
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search issues..."
           />
+
+          {/* added filter button and it open filter modal */}
+
           <button
             type="button"
             className={`ghost-button ${activeFilterCount ? 'has-filter' : ''}`}
@@ -636,6 +655,9 @@ export default function WorkspacePage() {
           >
             Add Filter{activeFilterCount ? ` (${activeFilterCount})` : '...'}
           </button>
+
+          {/* added display button and it open display modal */}
+
           {view === 'board' && (
             <div className="display-menu-anchor" ref={displayMenuRef}>
               <button
@@ -668,6 +690,9 @@ export default function WorkspacePage() {
               )}
             </div>
           )}
+
+          {/* this is show all group value after click add filter */}
+
           {filtersOpen && (
             <div className="filter-menu-shell">
               <div className="filter-menu">

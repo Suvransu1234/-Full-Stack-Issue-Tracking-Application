@@ -87,13 +87,14 @@ export async function getWorkspaceBundle(workspaceId, userId) {
     tasksResult,
     notificationsResult,
   ] = await Promise.all([
-    client.from('workspaces').select('*').eq('id', workspaceId).single(),
+    client.from('workspaces').select('*').eq('id', workspaceId).maybeSingle(),
     client
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', userId)
-      .single(),
+      .limit(1)
+      .maybeSingle(),
     client
       .from('workspace_members')
       .select('id, role, profiles(id, email, full_name, avatar_url)')
@@ -131,6 +132,9 @@ export async function getWorkspaceBundle(workspaceId, userId) {
     notificationsResult.error
 
   if (error) throw error
+  if (!workspaceResult.data || !membershipResult.data) {
+    throw new Error('Workspace not found or you do not have access.')
+  }
 
   return {
     workspace: workspaceResult.data,
