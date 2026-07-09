@@ -1667,9 +1667,33 @@ th {
 
 .notification-item strong {
   display: block;
+  margin-top: 4px;
   color: #242428;
   font-size: 0.86rem;
   text-transform: capitalize;
+}
+
+.notification-type-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  color: #5b21b6;
+  background: #f3e8ff;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.notification-project-line {
+  display: block;
+  overflow: hidden;
+  margin-top: 7px;
+  color: #2563eb;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notification-item p,

@@ -252,6 +252,9 @@ export default function WorkspacePage() {
     if (type === 'comment') return 'Comment'
     return type
   }
+  const findNotificationTask = (notification) =>
+    bundle?.tasks.find((task) => task.id === notification.task_id)
+
   const isAdmin = bundle?.role === 'admin'
   const activeFilterCount = [statusFilter, priorityFilter, labelFilter]
     .filter((value) => value !== 'all').length
@@ -453,12 +456,13 @@ export default function WorkspacePage() {
   }
 
   const openNotification = async (notification) => {
+    const task = findNotificationTask(notification)
+    if (task) openTaskDetail(task)
+    setNotificationsOpen(false)
+
     if (!notification.read) {
       await markNotificationRead(notification.id)
     }
-    const task = visibleTasks.find((item) => item.id === notification.task_id)
-    if (task) openTaskDetail(task)
-    setNotificationsOpen(false)
     await load()
   }
 
@@ -562,17 +566,30 @@ export default function WorkspacePage() {
                     <p>{overdueTasks.length} task{overdueTasks.length > 1 ? 's are' : ' is'} past due.</p>
                   </div>
                 )}
-                {unreadNotifications.map((notification) => (
-                  <button
-                    key={notification.id}
-                    type="button"
-                    className={`notification-item ${notification.read ? '' : 'is-unread'}`}
-                    onClick={() => openNotification(notification)}
-                  >
-                    <strong>{notificationTitle(notification.type)}</strong>
-                    <p>{notification.message}</p>
-                  </button>
-                ))}
+                {unreadNotifications.map((notification) => {
+                  const notificationTask = findNotificationTask(notification)
+                  const issueKey = notificationTask
+                    ? `TF-${notificationTask.id.slice(0, 6).toUpperCase()}`
+                    : 'Issue'
+
+                  return (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      className={`notification-item ${notification.read ? '' : 'is-unread'}`}
+                      onClick={() => openNotification(notification)}
+                    >
+                      <span className="notification-type-pill">
+                        {notificationTitle(notification.type)}
+                      </span>
+                      <small className="notification-project-line">
+                        {bundle.workspace.name} / {issueKey}
+                      </small>
+                      <strong>{notificationTask?.title || notification.message}</strong>
+                      <p>{notification.message}</p>
+                    </button>
+                  )
+                })}
                 {unreadNotifications.length === 0 && overdueTasks.length === 0 && (
                   <p className="empty-popover">No new notifications.</p>
                 )}
