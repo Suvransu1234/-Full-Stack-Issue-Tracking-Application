@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Cloud, Github, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import SettingsModal from '../components/SettingsModal'
 import { useAuth } from '../context/useAuth'
 import { createWorkspace, getMyDueTasks, getMyWorkspaces } from '../services/workspaceService'
+import WeatherWidget from '../components/WeatherWidget'
+import GitRankWidget from '../components/GitRankWidget'
+import '../components/FloatingWidgets.css'
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -33,6 +37,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [error, setError] = useState('')
+  const [activeWidget, setActiveWidget] = useState(null)
   const openWorkspace = (workspaceId) => {
     window.localStorage.setItem('trackflow_default_workspace_id', workspaceId)
     navigate(`/workspace/${workspaceId}`)
@@ -315,6 +320,31 @@ export default function DashboardPage() {
           onSignOut={signOut}
         />
       )}
+
+      <div className="floating-widgets-container">
+        {activeWidget === 'weather' && (
+          <WeatherWidget />
+        )}
+        {activeWidget === 'git' && (
+          <GitRankWidget />
+        )}
+        <div className="floating-widget-toggle">
+          {activeWidget ? (
+            <button className="fab-button" onClick={() => setActiveWidget(null)} title="Close Widget">
+              <X size={24} />
+            </button>
+          ) : (
+            <>
+              <button className="fab-button" onClick={() => setActiveWidget('weather')} title="Weather App">
+                <Cloud size={24} />
+              </button>
+              <button className="fab-button" onClick={() => setActiveWidget('git')} title="Git Rank">
+                <Github size={24} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </AppLayout>
   )
 }
