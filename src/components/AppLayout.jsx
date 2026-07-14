@@ -1,7 +1,9 @@
 import {
   CircleDot,
   CircleUserRound,
+  Cloud,
   FolderKanban,
+  GitBranch,
   Inbox,
   Layers,
   List,
@@ -9,9 +11,14 @@ import {
   Settings,
   SlidersHorizontal,
   Users,
+  X,
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../context/useAuth'
+import WeatherWidget from './WeatherWidget'
+import GitRankWidget from './GitRankWidget'
+import './FloatingWidgets.css'
 
 const defaultNavigation = [
   { label: 'Inbox', to: '/dashboard' },
@@ -51,6 +58,7 @@ const renderNavigationContent = (item) => {
 
 export default function AppLayout({ children, primaryNavigation, workspaceNavigation }) {
   const { profile } = useAuth()
+  const [activeWidget, setActiveWidget] = useState(null)
   const navigation = primaryNavigation || defaultNavigation
   const settingsItem = navigation.find((item) => item.value === 'settings' || item.label === 'Settings')
   const visibleNavigation = navigation.filter((item) => item !== settingsItem)
@@ -127,6 +135,28 @@ export default function AppLayout({ children, primaryNavigation, workspaceNaviga
       </aside>
 
       <main className="main-content">{children}</main>
+
+      {/* Global Floating Widgets */}
+      <div className="floating-widgets-container">
+        {activeWidget === 'weather' && <WeatherWidget />}
+        {activeWidget === 'git' && <GitRankWidget />}
+        <div className="floating-widget-toggle">
+          {activeWidget ? (
+            <button className="fab-button fab-close" onClick={() => setActiveWidget(null)} title="Close">
+              <X size={20} />
+            </button>
+          ) : (
+            <>
+              <button className="fab-button fab-weather" onClick={() => setActiveWidget('weather')} title="Weather">
+                <Cloud size={20} />
+              </button>
+              <button className="fab-button fab-git" onClick={() => setActiveWidget('git')} title="Git Rank">
+                <GitBranch size={20} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
